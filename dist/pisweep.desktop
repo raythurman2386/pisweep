@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Pisweep
+GenericName=Pisweep
+Comment=Classic Minesweeper for the pi suite
+Exec=pisweep 
+TryExec=pisweep
+Icon=pisweep
+Terminal=false
+StartupNotify=true
+Categories=Game;LogicGame;Utility;
+Keywords=minesweeper;game;puzzle;hint
+X-Pi-Suite=true
+X-Pi-KidSafe=true
+StartupWMClass=pisweep

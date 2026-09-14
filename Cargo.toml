@@ -1,0 +1,37 @@
+[package]
+name = "pisweep"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Classic Minesweeper for the pi suite"
+repository = "https://github.com/raythurman2386/pisweep"
+readme = "README.md"
+keywords = ["gpui", "minesweeper", "game", "puzzle"]
+categories = ["gui", "game", "logicgame", "utility"]
+
+[lib]
+name = "pisweep"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pisweep"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+directories = "6"
+gpui-kit = "0.6"
+notify = "8"
+rust-embed = "8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+
+[profile.dev]
+opt-level = 0
+
+[profile.dev.package."*"]
+opt-level = 2

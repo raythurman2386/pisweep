@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runs-on: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            # Native arm64 runner (free for public repos, Ubuntu 24.04,
+            # glibc 2.39) so GUI deps build without cross-compilation.
+            runs-on: ubuntu-24.04-arm
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97"
+          targets: ${{ matrix.target }}
+      - name: Install Linux system deps
+        run: bash scripts/ci-linux-deps.sh
+      - name: Build release
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        id: pkg
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          TARGET="${{ matrix.target }}" \
+            PREBUILT_BIN="target/${{ matrix.target }}/release/pisweep" \
+            bash scripts/package-linux.sh
+          TARBALL="target/package/pisweep-${VERSION}-${{ matrix.target }}.tar.gz"
+          test -f "$TARBALL"
+          echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
+          echo "asset=$(basename "$TARBALL")" >> "$GITHUB_OUTPUT"
+      - name: Smoke test the packaged tarball
+        run: |
+          TARBALL="target/package/pisweep-${GITHUB_REF_NAME#v}-${{ matrix.target }}.tar.gz"
+          TMPDIR="$(mktemp -d)"
+          trap 'rm -rf "$TMPDIR"' EXIT
+          tar -xzf "$TARBALL" -C "$TMPDIR"
+          PREFIX="$TMPDIR/prefix" "$TMPDIR"/pisweep-*/install.sh
+          test -x "$TMPDIR/prefix/bin/pisweep"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.pkg.outputs.asset }}
+          path: ${{ steps.pkg.outputs.tarball }}
+
+  release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Checksums
+        working-directory: artifacts
+        run: sha256sum * > checksums.txt && cat checksums.txt
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: artifacts/*
+          generate_release_notes: true
