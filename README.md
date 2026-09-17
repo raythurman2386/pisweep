@@ -1,61 +1,98 @@
 # Pisweep
 
-Classic Minesweeper for the pi suite, built with [GPUI Kit](https://github.com/longbridge/gpui-kit).
-Rules and the hint AI are a Rust port of [omamine](https://github.com/raythurman2386/omamine).
+Minesweeper for the [pi suite](https://github.com/raythurman2386), built with
+[GPUI Kit](https://github.com/longbridge/gpui-kit) — a small, native,
+theme-following desktop game written for Raspberry Pi 5-class hardware (and
+happy on any Linux desktop). Rules and the hint AI are a Rust port of
+[omamine](https://github.com/raythurman2386/omamine).
 
-The board engine and the knowledge solver are pure Rust with no UI imports, so first-click safety, flood-fill, chords, wins/losses, and certain hints are covered by unit tests.
+## Features
+
+- **Three classic boards** — Beginner (9×9, 10 mines), Intermediate
+  (16×16, 40), Expert (30×16, 99) — with first-click safety, flood-fill
+  reveals, and chord-clicking.
+- **Certain-solve hints**: the hint AI is a pure deduction solver (sentence
+  constraints, subset differences, remaining-mine counts). It never guesses;
+  `a` plays one provably safe reveal or flag, or tells you there is none.
+- **Game tools**: flagging, remaining-mine counter, timer, best times per
+  difficulty, and a face button to start over.
+- **Aesthetic**: keyboard-first, tooltips on every control (the face, hint,
+  and difficulty buttons also show their keybindings), and live desktop
+  theming (pimarchy/Omarchy palette + text scale).
+
+The board engine and the solver are pure Rust with no UI imports, so
+first-click safety, flood-fill, chords, wins/losses, and hint certainty are
+covered by unit tests (23 across the suite).
 
 ## Install
 
-User-local install (binary, icon, launcher). No root:
-
-```sh
-./scripts/install.sh
-```
-
-That puts `pisweep` on `~/.local/bin` and a desktop entry in the app launcher. Uninstall with `./scripts/uninstall.sh`.
-
-Or install straight from a tagged release without cloning:
+User-local install from a tagged release (no root, Ed25519-verified,
+fail-closed):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/raythurman2386/pisweep/main/scripts/netinstall.sh | bash
 ```
 
-The netinstaller resolves the latest `v*` release, verifies its `checksums.txt` against a pinned Ed25519 public key (fail closed — no signature or a bad one refuses the install), checks the tarball's SHA-256, then installs into `~/.local` (override with `--prefix DIR`, or a version argument: `... | bash -s -- 0.1.0`).
-
-Tagged releases (`v*`) build Linux tarballs on GitHub Actions for x86_64 and aarch64 (Raspberry Pi 5 and other 64-bit ARM boards), each requiring glibc 2.39+ (Debian 13, Ubuntu 24.04, current Raspberry Pi OS). Unpack the one for your machine and run `./install.sh` inside.
-
-## Release signing
-
-Every release's `checksums.txt` is signed with an Ed25519 key, so an installer can prove the checksums (and therefore the tarball) came from this repo:
-
-- `bash scripts/gen-signing-key.sh` generates the keypair into `~/.pisweep/signing` — the secret key stays offline forever and is never committed, used in CI, or uploaded. Only the public key is committed (`pisweep-signing-key.pub`) and pinned in the installers.
-- `bash scripts/sign-release.sh CHECKSUMS_FILE SECRET_KEY` signs one file; `scripts/sign-releases.sh VERSION...` batch-signs published releases offline into `~/.pisweep/signing/releases/<version>/`; `scripts/upload-release-sigs.sh VERSION...` attaches each `checksums.txt.sig` back to its release with `gh release upload --clobber`.
-
-Verification on the installer side is fail-closed: a release without a signature, or whose signature does not verify against the pinned public key, is refused.
-
-## Run from source
+Or build and install from source:
 
 ```sh
-cargo run --release
+cargo build --release
+./scripts/install.sh
 ```
 
-## Play
+Uninstall with `./scripts/uninstall.sh`. The netinstaller accepts a `--prefix`
+directory, an optional version argument, and `--force`; the source install
+honors `PREFIX=DIR`.
 
-| Input | Action |
-| --- | --- |
-| Left click / space / enter | Open |
+Tagged `v*` releases also build x86_64 + aarch64 tarballs on GitHub Actions
+(glibc 2.39+ — e.g. Raspberry Pi OS / Debian 13). Unpack the one for your
+architecture and run `./install.sh` inside.
+
+Releases are authenticated with Ed25519 signatures over `checksums.txt`; the
+public key is committed as `pisweep-signing-key.pub` and pinned in the
+installer, which refuses anything it cannot verify.
+
+## Keyboard
+
+| Keys | Action |
+|---|---|
+| Click / `space` / `enter` | Open a tile |
 | Right click / `f` / `x` | Flag |
 | Middle click / `c` | Chord |
-| Arrows or `hjkl` | Cursor |
-| `n` or the face | New game |
-| Hint / `a` | One certain solver move |
-| `1` `2` `3` | Beginner, Intermediate, Expert |
-| `?` | Keys |
-| `Ctrl+Q` | Quit |
+| Arrows / `hjkl` | Move the cursor |
+| `n` / the face | New game |
+| `a` | One certain solver move (hint) |
+| `1` / `2` / `3` | Beginner · Intermediate · Expert |
+| `?` | Help overlay · `F11`/`Super+F` fullscreen · `Ctrl+Q` quit |
 
-The first click is always safe. Best times are stored in `~/.local/share/pisweep/stats.json`. Hover any control or tile for a tooltip; the face, hint, and difficulty buttons also show their keybindings.
+## State and theming
+
+- Best times live in `~/.local/share/pisweep/stats.json`.
+- Colors follow the desktop theme —
+  `~/.local/state/pimarchy/current/theme/colors.toml` first, then Omarchy —
+  re-tinting live on theme switches; text follows the desktop text scale.
+  `PISWEEP_THEME_DIR` overrides the search for tests.
 
 ## Fonts
 
-The iA Writer Mono font is bundled under the SIL Open Font License 1.1; see `fonts/OFL.txt`. The font is copyright Information Architects Inc. and based on IBM Plex, copyright IBM Corp.
+The iA Writer Mono font is bundled under the SIL Open Font License 1.1; see
+`fonts/OFL.txt`. The font is copyright Information Architects Inc. and based
+on IBM Plex, copyright IBM Corp.
+
+## Development
+
+```sh
+cargo fmt --check          # formatting
+cargo clippy --all-targets -- -D warnings
+cargo test                 # 23 tests
+cargo run --release        # play
+```
+
+CI runs fmt, clippy, and tests on every push; tagged `v*` releases build
+x86_64 + aarch64 tarballs (glibc 2.39+) with an install smoke test, and the
+netinstall integrity harness can be run locally with
+`bash scripts/test-netinstall.sh`.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Bundled fonts: SIL OFL 1.1 (see above).
